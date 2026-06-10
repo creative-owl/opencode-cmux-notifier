@@ -2,7 +2,7 @@
   "name": "opencode-cmux-notifier",
   "description": "OpenCode plugin that publishes agent status and notifications to cmux.",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "main": "plugins/cmux-status.js",
   "repository": {

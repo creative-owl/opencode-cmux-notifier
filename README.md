@@ -70,4 +70,4 @@ The script confirms the plugin exports the expected capabilities, exposes OpenCo
 
 ## License
 
-No public license has been declared for this project.
+MIT. See `LICENSE`.
