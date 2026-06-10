@@ -31,14 +31,14 @@ The plugin only calls `cmux` when it detects one of these conditions:
 
 - `CMUX_WORKSPACE_ID` is set
 - `CMUX_SURFACE_ID` is set
-- `CMUX_SOCKET_PATH` exists, or `/tmp/cmux.sock` exists
+- `CMUX_SOCKET_PATH` exists, `/tmp/cmux.sock` exists, or `~/.local/state/cmux/cmux.sock` exists
 
 When `CMUX_WORKSPACE_ID` is set, the plugin passes it to `cmux` as `--workspace`.
 
 ## Status Capabilities
 
 - `working`: LLM or agent work is in progress. Triggered by `chat.params`, `chat.message`, `tool.execute.before`, and busy session status events.
-- `waitingForInput`: OpenCode is waiting for user input or permission. Triggered by permission ask/update events.
+- `waitingForInput`: OpenCode is waiting for user input or permission, shown as `Needs Input`. Triggered by permission ask/update events.
 - `retrying`: The session is retrying a failed operation.
 - `idle`: The active session is idle or complete.
 - `error`: The active session errored.

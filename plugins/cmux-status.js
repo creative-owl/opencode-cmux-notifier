@@ -1,21 +1,22 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 
-const STATUS_KEY = "opencode";
+const STATUS_KEY = "opencode-cmux-notifier";
 const TITLE = "OpenCode";
-const DEFAULT_SOCKET = "/tmp/cmux.sock";
+const DEFAULT_SOCKET_PATHS = ["/tmp/cmux.sock", `${homedir()}/.local/state/cmux/cmux.sock`];
 const COMMAND_TIMEOUT = 3000;
 const AGENT_TOOL_NAMES = new Set(["Task", "task", "subtask", "agent"]);
 
 const STATUS = {
   running: { label: "Running", color: "#0a84ff", priority: 90 },
-  waiting: { label: "Waiting", color: "#ff9500", priority: 100 },
+  waiting: { label: "Needs Input", color: "#ff9500", priority: 100 },
   retrying: { label: "Retrying", color: "#ffcc00", priority: 95 },
   idle: { label: "Idle", color: "#34c759", priority: 50 },
   error: { label: "Error", color: "#ff3b30", priority: 100 },
 };
 
-export const STATUS_CAPABILITIES = Object.freeze({
+const STATUS_CAPABILITIES = Object.freeze({
   working: {
     status: STATUS.running,
     description: "LLM or agent work is in progress",
@@ -43,7 +44,7 @@ export const STATUS_CAPABILITIES = Object.freeze({
   },
 });
 
-export const SUPPORTED_HOOKS = Object.freeze([
+const SUPPORTED_HOOKS = Object.freeze([
   "chat.message",
   "chat.params",
   "tool.execute.before",
@@ -57,8 +58,8 @@ function hasCmuxContext() {
     return true;
   }
 
-  const socketPath = process.env.CMUX_SOCKET_PATH || DEFAULT_SOCKET;
-  return existsSync(socketPath);
+  const socketPaths = process.env.CMUX_SOCKET_PATH ? [process.env.CMUX_SOCKET_PATH] : DEFAULT_SOCKET_PATHS;
+  return socketPaths.some((socketPath) => existsSync(socketPath));
 }
 
 function workspaceArgs() {
@@ -71,7 +72,7 @@ function runCmux(args) {
   }
 
   return new Promise((resolve) => {
-    const child = spawn("cmux", [...args, ...workspaceArgs()], {
+    const child = spawn(process.env.CMUX_BUNDLED_CLI_PATH || "cmux", [...args, ...workspaceArgs()], {
       stdio: "ignore",
       env: process.env,
     });
@@ -109,7 +110,7 @@ function errorMessage(error) {
   return "An error occurred";
 }
 
-export default async function CmuxStatusPlugin() {
+async function CmuxStatusPlugin() {
   let cmuxQueue = Promise.resolve();
   let activeSessionID;
   let currentStatus;
@@ -178,7 +179,7 @@ export default async function CmuxStatusPlugin() {
 
     await setStatus(STATUS.waiting);
     await notify({
-      subtitle: "Waiting",
+      subtitle: STATUS.waiting.label,
       body: permission?.title || "Agent needs input",
     });
   }
@@ -227,6 +228,11 @@ export default async function CmuxStatusPlugin() {
             return;
           }
 
+          if (waitingPermissions.size > 0) {
+            await setStatus(STATUS.waiting);
+            return;
+          }
+
           await setStatus(STATUS.idle);
           return;
         }
@@ -234,6 +240,12 @@ export default async function CmuxStatusPlugin() {
         case "session.idle": {
           const { sessionID } = event.properties;
           activeSessionID = sessionID;
+
+          if (waitingPermissions.size > 0) {
+            await setStatus(STATUS.waiting);
+            return;
+          }
+
           await setStatus(STATUS.idle);
 
           if (!notifiedIdleSessions.has(sessionID)) {
@@ -277,3 +289,8 @@ export default async function CmuxStatusPlugin() {
     },
   };
 }
+
+CmuxStatusPlugin.STATUS_CAPABILITIES = STATUS_CAPABILITIES;
+CmuxStatusPlugin.SUPPORTED_HOOKS = SUPPORTED_HOOKS;
+
+export default CmuxStatusPlugin;
